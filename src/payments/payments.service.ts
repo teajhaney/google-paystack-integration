@@ -1,18 +1,15 @@
 import {
   Injectable,
-  BadRequestException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaystackService } from './paystack.service';
 
-/**
- * Payments Service
- *
- * This service handles payment-related business logic and database operations.
- * It coordinates between Paystack API and our database.
- */
+// Payments Service
+// This service handles payment-related business logic and database operations.
+// It coordinates between Paystack API and our database.
 
 @Injectable()
 export class PaymentsService {
@@ -21,25 +18,10 @@ export class PaymentsService {
     private paystackService: PaystackService, // Paystack API service
   ) {}
 
-  /**
-   * Initiate a payment transaction
-   *
-   * This method:
-   * 1. Checks if a transaction with the same reference already exists (idempotency)
-   * 2. Creates a new transaction on Paystack
-   * 3. Saves the transaction to our database
-   *
-   * Idempotency: If the same transaction is initiated twice with the same reference,
-   * we return the existing transaction instead of creating a duplicate.
-   *
-   * @param userId - ID of the user making the payment
-   * @param amount - Amount in Kobo
-   * @param email - User's email address
-   * @param reference - Optional: Custom reference for idempotency
-   * @returns Transaction reference and authorization URL
-   */
+  // Initiate a payment transaction
+
   async initiatePayment(userId: string, amount: number, reference?: string) {
-    // Step 1: Check if user exists and get their email
+    // Check if user exists and get their email
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -51,7 +33,8 @@ export class PaymentsService {
     // Use the user's email from database
     const userEmail = user.email;
 
-    // Step 2: If reference is provided, check for existing transaction (idempotency)
+    // If reference is provided, check for existing transaction (idempotency)
+
     if (reference) {
       const existingTransaction = await this.prisma.transaction.findUnique({
         where: { reference },
@@ -73,11 +56,11 @@ export class PaymentsService {
       }
     }
 
-    // Step 3: Initialize transaction on Paystack
+    // Initialize transaction on Paystack
     const paystackResponse = await this.paystackService.initializeTransaction(
       amount,
-      userEmail, // Use email from database
-      reference, // Pass reference for idempotency on Paystack's side too
+      userEmail,
+      reference,
     );
 
     // Step 4: Save transaction to database
@@ -97,18 +80,8 @@ export class PaymentsService {
     };
   }
 
-  /**
-   * Get transaction status
-   *
-   * This method:
-   * 1. Finds the transaction in our database
-   * 2. Optionally refreshes status from Paystack if requested
-   * 3. Returns the current transaction status
-   *
-   * @param reference - Transaction reference
-   * @param refresh - If true, fetch latest status from Paystack
-   * @returns Transaction status information
-   */
+  // Get transaction status
+
   async getTransactionStatus(reference: string, refresh: boolean = false) {
     // Step 1: Find transaction in database
     let transaction = await this.prisma.transaction.findUnique({
@@ -120,12 +93,9 @@ export class PaymentsService {
       // If transaction doesn't exist in DB and refresh is requested, try Paystack
       if (refresh) {
         try {
-          const paystackData =
-            await this.paystackService.verifyTransaction(reference);
+          // Verify if transaction exists on Paystack
+          await this.paystackService.verifyTransaction(reference);
 
-          // Transaction exists on Paystack but not in our DB - create it
-          // Note: We need a userId, but we don't have it. This is an edge case.
-          // In a real app, you might want to handle this differently.
           throw new NotFoundException(
             'Transaction not found in database. Please initiate the transaction first.',
           );
@@ -140,7 +110,7 @@ export class PaymentsService {
       }
     }
 
-    // Step 2: If refresh is requested, get latest status from Paystack
+    // If refresh is requested, get latest status from Paystack
     if (refresh) {
       try {
         const paystackData =
@@ -162,7 +132,7 @@ export class PaymentsService {
             paidAt: paystackData.paid_at
               ? new Date(paystackData.paid_at)
               : null,
-            metadata: paystackData.metadata || {},
+            metadata: (paystackData.metadata as Prisma.InputJsonValue) || {},
             updatedAt: new Date(),
           },
           include: { user: true },
@@ -178,6 +148,11 @@ export class PaymentsService {
     }
 
     // Step 3: Return transaction status
+    // Transaction is guaranteed to be non-null here because we throw if it's null earlier
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+
     return {
       reference: transaction.reference,
       status: transaction.status as 'pending' | 'success' | 'failed',
@@ -186,22 +161,15 @@ export class PaymentsService {
     };
   }
 
-  /**
-   * Update transaction status from webhook
-   *
-   * This method is called when Paystack sends a webhook notification.
-   * It updates the transaction status in our database.
-   *
-   * @param reference - Transaction reference
-   * @param status - New status from Paystack
-   * @param paidAt - When payment was completed (optional)
-   * @param metadata - Additional transaction data (optional)
-   */
+  // Update transaction status from webhook
+  // This method is called when Paystack sends a webhook notification.
+  // It updates the transaction status in our database.
+
   async updateTransactionFromWebhook(
     reference: string,
     status: 'pending' | 'success' | 'failed',
     paidAt?: Date,
-    metadata?: any,
+    metadata?: Record<string, unknown>,
   ) {
     // Update transaction in database
     await this.prisma.transaction.update({
@@ -209,7 +177,7 @@ export class PaymentsService {
       data: {
         status,
         paidAt: paidAt || null,
-        metadata: metadata || {},
+        metadata: (metadata as Prisma.InputJsonValue) || {},
         updatedAt: new Date(),
       },
     });

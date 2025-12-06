@@ -4,15 +4,6 @@ import { PaymentsService } from './payments.service';
 import { PaystackService } from './paystack.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
-/**
- * Payments Module
- *
- * This module encapsulates all payment-related functionality.
- * It provides:
- * - Paystack service (API integration)
- * - Payments service (business logic)
- * - Payments controller (HTTP endpoints)
- */
 @Module({
   imports: [PrismaModule], // Import PrismaModule to use PrismaService
   controllers: [PaymentsController], // Register the controller

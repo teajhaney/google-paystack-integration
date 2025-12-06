@@ -5,37 +5,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { GoogleTokenResponse, GoogleUserInfo } from 'src/interface';
 
-/**
- * Google OAuth Service
- *
- * This service handles all interactions with Google's OAuth 2.0 API.
- *
- * OAuth 2.0 Flow Explanation:
- * 1. User clicks "Sign in with Google" → Redirect to Google
- * 2. User authorizes → Google redirects back with a "code"
- * 3. We exchange the "code" for an "access_token"
- * 4. We use the "access_token" to get user information
- */
-
-interface GoogleTokenResponse {
-  access_token: string;
-  expires_in: number;
-  refresh_token?: string;
-  scope: string;
-  token_type: string;
-  id_token?: string;
-}
-
-interface GoogleUserInfo {
-  id: string; // Google's unique user ID
-  email: string;
-  verified_email: boolean;
-  name: string;
-  picture: string;
-  given_name?: string;
-  family_name?: string;
-}
+// Google OAuth Service
 
 @Injectable()
 export class GoogleOAuthService {
@@ -66,19 +38,15 @@ export class GoogleOAuthService {
     this.redirectUri = redirectUri;
   }
 
-  /**
-   * Generate the Google OAuth authorization URL
-   *
-   * This URL is where users will be redirected to sign in with Google.
-   *
-   * @returns The full Google OAuth URL with all required parameters
-   */
+  //Generate the Google OAuth authorization URL with all required parameters
+  // This URL is where users will be redirected to sign in with Google.
+
   getAuthUrl(): string {
     // Build the authorization URL with required OAuth 2.0 parameters
     const params = new URLSearchParams({
-      client_id: this.clientId, // Your app's client ID
-      redirect_uri: this.redirectUri, // Where Google should send the user after authorization
-      response_type: 'code', // We want an authorization code (not a token directly)
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      response_type: 'code',
       scope: 'openid email profile', // What information we're requesting
       // openid: Required for OpenID Connect
       // email: User's email address
@@ -98,18 +66,10 @@ export class GoogleOAuthService {
     return authUrl;
   }
 
-  /**
-   * Exchange authorization code for access token
-   *
-   * After Google redirects back with a "code", we exchange it for an access token.
-   * This is a server-to-server call (never expose the client secret to the browser).
-   *
-   * @param code - The authorization code from Google's redirect
-   * @returns Access token and related information
-   */
+  // Exchange authorization code for access token
+
   async exchangeCodeForToken(code: string): Promise<GoogleTokenResponse> {
     try {
-      // Log the request details for debugging (without exposing secrets)
       console.log('Exchanging code for token:', {
         code_length: code.length,
         redirect_uri: this.redirectUri,
@@ -122,8 +82,8 @@ export class GoogleOAuthService {
         {
           code, // The authorization code from the redirect
           client_id: this.clientId,
-          client_secret: this.clientSecret, // Secret key (never expose this!)
-          redirect_uri: this.redirectUri, // Must match the redirect_uri used in getAuthUrl()
+          client_secret: this.clientSecret,
+          redirect_uri: this.redirectUri,
           grant_type: 'authorization_code', // OAuth 2.0 grant type
         },
         {
@@ -168,14 +128,8 @@ export class GoogleOAuthService {
     }
   }
 
-  /**
-   * Fetch user information from Google using access token
-   *
-   * Once we have an access token, we can use it to get the user's profile information.
-   *
-   * @param accessToken - The access token obtained from exchangeCodeForToken
-   * @returns User information (email, name, picture, etc.)
-   */
+  // Fetch user information from Google using access token
+
   async getUserInfo(accessToken: string): Promise<GoogleUserInfo> {
     try {
       // Make a GET request to Google's userinfo endpoint

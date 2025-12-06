@@ -10,15 +10,6 @@ import {
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 
-/**
- * Auth Controller
- *
- * This controller handles HTTP requests related to authentication.
- * It exposes two endpoints:
- * 1. GET /auth/google - Initiates Google sign-in flow
- * 2. GET /auth/google/callback - Handles Google's redirect after authorization
- */
-
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -59,7 +50,7 @@ export class AuthController {
       }
 
       // Otherwise, return JSON with the URL
-      // With passthrough: true, we can return normally and NestJS will serialize it
+
       return {
         google_auth_url: googleAuthUrl,
       };
@@ -76,13 +67,8 @@ export class AuthController {
     }
   }
 
-  /**
-   * GET /auth/google/config (Diagnostic endpoint)
-   *
-   * Purpose: Show current Google OAuth configuration (for debugging)
-   *
-   * This endpoint helps verify that the redirect URI matches Google Cloud Console.
-   */
+  //Purpose: Show current Google OAuth configuration (for debugging)
+
   @Get('google/config')
   getGoogleConfig() {
     const authUrl = this.authService.getGoogleAuthUrl();
@@ -104,30 +90,8 @@ export class AuthController {
     };
   }
 
-  /**
-   * GET /auth/google/callback
-   *
-   * Purpose: Handle Google OAuth callback
-   *
-   * Flow:
-   * 1. User authorizes on Google
-   * 2. Google redirects to this endpoint with a "code" query parameter
-   * 3. We exchange the code for user information
-   * 4. We save/update the user in our database
-   * 5. We return user information
-   *
-   * Query parameters:
-   * - code: Authorization code from Google (required)
-   * - error: Error code if user denied authorization (optional)
-   *
-   * Response:
-   * - 200 JSON → { "user_id": "...", "email": "...", "name": "..." }
-   *
-   * Errors:
-   * - 400: Missing code or invalid request
-   * - 401: Invalid authorization code
-   * - 500: Internal server error
-   */
+  // Handle Google OAuth callback
+
   @Get('google/callback')
   async handleGoogleCallback(
     @Query('code') code?: string,

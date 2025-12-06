@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
+import { PaystackInitialiseRequestBody } from 'src/interface';
 
 /**
  * Paystack Service
@@ -83,16 +84,9 @@ export class PaystackService {
     });
   }
 
-  /**
-   * Initialize a Paystack transaction
-   *
-   * This creates a new payment transaction on Paystack's side.
-   *
-   * @param amount - Amount in Kobo (lowest currency unit)
-   * @param email - User's email address
-   * @param reference - Optional: Custom reference (for idempotency)
-   * @returns Transaction reference and authorization URL
-   */
+  // Initialize a Paystack transaction
+  // This creates a new payment transaction on Paystack's side.
+
   async initializeTransaction(
     amount: number,
     email: string,
@@ -100,15 +94,15 @@ export class PaystackService {
   ): Promise<{ reference: string; authorizationUrl: string }> {
     try {
       // Prepare the request body for Paystack
-      const requestBody: any = {
-        amount: amount, // Amount is already in Kobo (lowest currency unit)
-        email, // User's email
-        currency: 'NGN', // Nigerian Naira (Paystack's default)
+      const requestBody: PaystackInitialiseRequestBody = {
+        amount,
+        email,
+        currency: 'NGN',
       };
 
       // If a reference is provided, use it (for idempotency)
       if (reference) {
-        (requestBody as { reference: string }).reference = reference;
+        requestBody.reference = reference;
       }
 
       // Make POST request to Paystack's initialize transaction endpoint
@@ -153,17 +147,9 @@ export class PaystackService {
     }
   }
 
-  /**
-   * Verify a Paystack transaction
-   *
-   * This checks the current status of a transaction on Paystack's side.
-   * We use this to:
-   * - Verify payment status when user requests it
-   * - Sync transaction status with Paystack
-   *
-   * @param reference - Transaction reference from Paystack
-   * @returns Transaction details including status
-   */
+  // Verify a Paystack transaction
+  // This checks the current status of a transaction on Paystack's side.
+
   async verifyTransaction(
     reference: string,
   ): Promise<PaystackVerifyResponse['data']> {
