@@ -7,17 +7,11 @@ import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import config from './config/config';
 
-/**
- * App Module (Root Module)
- *
- * This is the root module of the application.
- * It imports all feature modules and configuration.
- */
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // Make ConfigModule available globally
-      load: [config], // Load custom configuration
+      isGlobal: true,
+      load: [config],
     }),
     PrismaModule, // Database module
     AuthModule, // Authentication module (Google OAuth)

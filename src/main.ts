@@ -8,18 +8,14 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable global validation pipe
-  // This automatically validates all incoming requests using class-validator decorators
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties that don't have decorators
-      forbidNonWhitelisted: true, // Throw error if non-whitelisted properties are present
-      transform: true, // Automatically transform payloads to DTO instances
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
 
-  // Enable CORS (Cross-Origin Resource Sharing)
-  // In production, configure this properly for your frontend domain
   app.enableCors();
 
   const port = process.env.PORT || 3000;
@@ -27,4 +23,7 @@ async function bootstrap() {
 
   console.log(`🚀 Application is running on: http://localhost:${port}`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Error starting app:', err);
+  process.exit(1);
+});
