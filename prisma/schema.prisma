@@ -1,0 +1,48 @@
+// This is your Prisma schema file.
+// Prisma is an ORM (Object-Relational Mapping) tool that lets you interact with your database using TypeScript.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model: Stores information about users who sign in with Google
+model User {
+  id        String   @id @default(uuid()) // Unique identifier for each user
+  googleId  String   @unique // Google's unique ID for this user (prevents duplicates)
+  email     String   @unique // User's email address (also unique)
+  name      String?  // User's full name (optional, in case Google doesn't provide it)
+  picture   String?  // URL to user's profile picture (optional)
+  createdAt DateTime @default(now()) // When the user record was created
+  updatedAt DateTime @updatedAt // When the user record was last updated
+
+  // Relationship: One user can have many transactions
+  transactions Transaction[]
+
+  @@map("users") // Maps to "users" table in PostgreSQL
+}
+
+// Transaction model: Stores payment transaction information from Paystack
+model Transaction {
+  id              String   @id @default(uuid()) // Unique identifier for this transaction
+  reference       String   @unique // Paystack transaction reference (unique, used as idempotency key)
+  amount          Int      // Amount in Kobo (lowest currency unit - 1 Naira = 100 Kobo)
+  status          String   @default("pending") // Transaction status: pending, success, failed
+  authorizationUrl String? // URL where user can complete payment
+  paidAt          DateTime? // When payment was completed (null if not paid yet)
+  metadata        Json?    // Store any additional data from Paystack (optional)
+  
+  // Foreign key: Which user made this transaction
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now()) // When transaction was created
+  updatedAt       DateTime @updatedAt // When transaction was last updated
+
+  @@map("transactions") // Maps to "transactions" table in PostgreSQL
+}
+
