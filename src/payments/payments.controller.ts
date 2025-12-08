@@ -15,6 +15,7 @@ import {
   HttpStatus,
   UsePipes,
   ValidationPipe,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -22,6 +23,9 @@ import { PaymentsService } from './payments.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { verifyPaystackWebhook } from './paystack-webhook.util';
 import type { PaystackWebhookEvent } from '../interface';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { User } from '../auth/user.decorator';
+import type { UserPayload } from '../auth/user.decorator';
 
 //Payments Controller
 // This controller handles HTTP requests related to payments.
@@ -47,30 +51,27 @@ export class PaymentsController {
   }
 
   //Initiate a Paystack payment transaction
+  // Requires JWT authentication - user must be authenticated to make payments
 
   @Post('paystack/initiate')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ transform: true }))
   async initiatePayment(
     @Body() dto: InitiatePaymentDto,
-    @Query('userId') userIdQuery?: string,
-    @Headers('x-user-id') userIdHeader?: string,
+    @User() user: UserPayload,
   ) {
-    // Get userId from query parameter or header
-    // In production, you'd extract this from JWT token
-    const userId = userIdHeader || userIdQuery;
-
-    if (!userId) {
-      throw new UnauthorizedException(
-        'User ID is required. Please provide userId in query parameter or x-user-id header.',
-      );
-    }
-
     try {
+      // Get userId from authenticated JWT token
+      const userId = user.userId;
+
       // The service will get the user's email from the database
+      // If reference is provided and transaction exists, it will return the existing transaction
+      const reference = dto.reference as string | undefined;
       const result = await this.paymentsService.initiatePayment(
         userId,
         dto.amount,
+        reference,
       );
 
       return result;
@@ -132,6 +133,8 @@ export class PaymentsController {
       // Parse webhook event
       const event = req.body as PaystackWebhookEvent;
 
+      console.log('Received Paystack webhook event:', event.event);
+
       // Paystack sends different event types
       if (event.event === 'charge.success' || event.event === 'charge.failed') {
         const transactionData = event.data;
@@ -144,6 +147,10 @@ export class PaymentsController {
           status = 'failed';
         }
 
+        console.log(
+          `Updating transaction ${transactionData.reference} to status: ${status}`,
+        );
+
         // Update transaction in database
         await this.paymentsService.updateTransactionFromWebhook(
           transactionData.reference,
@@ -153,6 +160,12 @@ export class PaymentsController {
             : undefined,
           transactionData.metadata,
         );
+
+        console.log(
+          `Successfully updated transaction ${transactionData.reference}`,
+        );
+      } else {
+        console.log(`Unhandled webhook event type: ${event.event}`);
       }
 
       return { status: true };
@@ -163,26 +176,35 @@ export class PaymentsController {
   }
 
   //  Get transaction status
+  // Requires JWT authentication - users can only check their own transactions
 
   @Get(':reference/status')
+  @UseGuards(JwtAuthGuard)
   async getTransactionStatus(
     @Param('reference') reference: string,
+    @User() user: UserPayload,
     @Query('refresh') refresh?: string,
   ) {
     try {
       // Check if refresh is requested
       const shouldRefresh = refresh === 'true';
 
-      // Get transaction status
+      // Get transaction status (service will verify ownership)
       const status = await this.paymentsService.getTransactionStatus(
         reference,
         shouldRefresh,
+        user.userId,
       );
 
       return status;
     } catch (error) {
       // Handle not found errors
       if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      // Handle unauthorized errors
+      if (error instanceof UnauthorizedException) {
         throw error;
       }
 

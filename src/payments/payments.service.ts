@@ -81,8 +81,13 @@ export class PaymentsService {
   }
 
   // Get transaction status
+  // userId is optional but if provided, ensures user can only access their own transactions
 
-  async getTransactionStatus(reference: string, refresh: boolean = false) {
+  async getTransactionStatus(
+    reference: string,
+    refresh: boolean = false,
+    userId?: string,
+  ) {
     // Step 1: Find transaction in database
     let transaction = await this.prisma.transaction.findUnique({
       where: { reference },
@@ -110,8 +115,19 @@ export class PaymentsService {
       }
     }
 
-    // If refresh is requested, get latest status from Paystack
-    if (refresh) {
+    // Security check: Ensure user can only access their own transactions
+    if (userId && transaction.userId !== userId) {
+      throw new UnauthorizedException(
+        'You do not have permission to access this transaction',
+      );
+    }
+
+    // Automatically check Paystack if:
+    // 1. Refresh is explicitly requested, OR
+    // 2. Status is still pending (webhook might not have fired yet)
+    const shouldCheckPaystack = refresh || transaction.status === 'pending';
+
+    if (shouldCheckPaystack) {
       try {
         const paystackData =
           await this.paystackService.verifyTransaction(reference);
@@ -124,19 +140,21 @@ export class PaymentsService {
           status = 'failed';
         }
 
-        // Update transaction in database
-        transaction = await this.prisma.transaction.update({
-          where: { reference },
-          data: {
-            status,
-            paidAt: paystackData.paid_at
-              ? new Date(paystackData.paid_at)
-              : null,
-            metadata: (paystackData.metadata as Prisma.InputJsonValue) || {},
-            updatedAt: new Date(),
-          },
-          include: { user: true },
-        });
+        // Update transaction in database if status changed
+        if (status !== transaction.status) {
+          transaction = await this.prisma.transaction.update({
+            where: { reference },
+            data: {
+              status,
+              paidAt: paystackData.paid_at
+                ? new Date(paystackData.paid_at)
+                : null,
+              metadata: (paystackData.metadata as Prisma.InputJsonValue) || {},
+              updatedAt: new Date(),
+            },
+            include: { user: true },
+          });
+        }
       } catch (error) {
         // If Paystack verification fails, return DB status
         // Log the error in production

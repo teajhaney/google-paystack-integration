@@ -47,3 +47,30 @@ export interface PaystackWebhookEvent {
   event: string;
   data: PaystackWebhookTransactionData;
 }
+
+export interface PaystackVerifyResponse {
+  status: boolean;
+  message: string;
+  data: {
+    id: number;
+    domain: string;
+    status: string; // "success", "failed", "pending", etc.
+    reference: string;
+    amount: number; // Amount in Kobo
+    currency: string;
+    paid_at: string | null; // ISO date string when payment was completed
+    created_at: string;
+    metadata: any;
+    // ... other fields
+  };
+}
+
+export interface PaystackInitializeResponse {
+  status: boolean;
+  message: string;
+  data: {
+    authorization_url: string; // URL where user can complete payment
+    access_code: string;
+    reference: string; // Unique transaction reference (we use this as idempotency key)
+  };
+}

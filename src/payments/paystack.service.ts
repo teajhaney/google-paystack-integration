@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import { PaystackInitialiseRequestBody } from 'src/interface';
+import {
+  PaystackInitialiseRequestBody,
+  PaystackInitializeResponse,
+  PaystackVerifyResponse,
+} from 'src/interface';
 
 /**
  * Paystack Service
@@ -21,33 +25,6 @@ import { PaystackInitialiseRequestBody } from 'src/interface';
  * 5. Paystack sends a webhook or we verify the transaction
  * 6. We update the transaction status in our database
  */
-
-interface PaystackInitializeResponse {
-  status: boolean;
-  message: string;
-  data: {
-    authorization_url: string; // URL where user can complete payment
-    access_code: string;
-    reference: string; // Unique transaction reference (we use this as idempotency key)
-  };
-}
-
-interface PaystackVerifyResponse {
-  status: boolean;
-  message: string;
-  data: {
-    id: number;
-    domain: string;
-    status: string; // "success", "failed", "pending", etc.
-    reference: string;
-    amount: number; // Amount in Kobo
-    currency: string;
-    paid_at: string | null; // ISO date string when payment was completed
-    created_at: string;
-    metadata: any;
-    // ... other fields
-  };
-}
 
 @Injectable()
 export class PaystackService {
